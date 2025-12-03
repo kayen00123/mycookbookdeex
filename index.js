@@ -2303,47 +2303,10 @@ app.get('/api/orders', async (req, res) => {
     asks.sort((a, b) => a.price - b.price)  // lowest ask first
     bids.sort((a, b) => b.price - a.price)  // highest bid first
 
-    // Aggregate orders by price level
-    const aggregatedAsks = []
-    const askGroups = new Map()
-    for (const order of asks) {
-      const p = order.price
-      if (!askGroups.has(p)) {
-        askGroups.set(p, { price: p, amountIn: 0, amountOutMin: 0, count: 0 })
-      }
-      const group = askGroups.get(p)
-      group.amountIn += Number(order.amountIn)
-      group.amountOutMin += Number(order.amountOutMin || 0)
-      group.count += 1
-    }
-    for (const group of askGroups.values()) {
-      aggregatedAsks.push({ id: `ask-${group.price}`, price: group.price, amountIn: group.amountIn.toString(), amountOutMin: group.amountOutMin.toString(), tokenIn: base, tokenOut: quote })
-    }
-    aggregatedAsks.sort((a, b) => a.price - b.price) // ensure sorted
-
-    const aggregatedBids = []
-    const bidGroups = new Map()
-    for (const order of bids) {
-      const p = order.price
-      if (!bidGroups.has(p)) {
-        bidGroups.set(p, { price: p, amountIn: 0, amountOutMin: 0, count: 0 })
-      }
-      const group = bidGroups.get(p)
-      // For bids, amountIn is quote, calculate base quantity they want
-      const baseQty = minOut(toBN(order.amountIn), toBN(order.amountIn), toBN(order.amountOutMin || 0))
-      group.amountIn += Number(order.amountIn)
-      group.amountOutMin += Number(baseQty)
-      group.count += 1
-    }
-    for (const group of bidGroups.values()) {
-      aggregatedBids.push({ id: `bid-${group.price}`, price: group.price, amountIn: group.amountIn.toString(), amountOutMin: group.amountOutMin.toString(), tokenIn: quote, tokenOut: base })
-    }
-    aggregatedBids.sort((a, b) => b.price - a.price) // ensure sorted
-
-    // Limit to top 50 levels for performance
-    const limitedAsks = aggregatedAsks.slice(0, 50)
-    const limitedBids = aggregatedBids.slice(0, 50)
-
+    // Return individual orders instead of aggregating by price level
+    // Limit to top 50 orders per side for performance
+    const limitedAsks = asks.slice(0, 50)
+    const limitedBids = bids.slice(0, 50)
 
     return res.json({ base, quote, asks: limitedAsks, bids: limitedBids, updatedAt: Date.now() })
   } catch (e) {
