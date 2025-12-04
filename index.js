@@ -2070,6 +2070,39 @@ app.post('/api/orders/cancel', async (req, res) => {
   }
 })
 
+app.post('/api/orders/lookup', async (req, res) => {
+  try {
+    if (!SUPABASE_ENABLED) return res.status(503).json({ error: 'database disabled' })
+    const { network, maker, tokenIn, tokenOut, nonce, salt } = req.body || {}
+    if (!network || !maker || !tokenIn || !tokenOut || nonce == null || salt == null) {
+      return res.status(400).json({ error: 'network, maker, tokenIn, tokenOut, nonce, and salt required' })
+    }
+
+    const tableName = network === 'crosschain' ? 'cross_chain_orders' : 'orders'
+    const { data, error } = await supabase
+      .from(tableName)
+      .select('order_id')
+      .eq('network', network)
+      .eq('maker', toLower(maker))
+      .eq('token_in', toLower(tokenIn))
+      .eq('token_out', toLower(tokenOut))
+      .eq('nonce', String(nonce))
+      .eq('salt', String(salt))
+      .limit(1)
+
+    if (error) throw error
+
+    if (data && data.length > 0) {
+      return res.json({ orderId: data[0].order_id })
+    } else {
+      return res.status(404).json({ error: 'order not found' })
+    }
+  } catch (e) {
+    console.error('[orders/lookup] error:', e?.message || e)
+    return res.status(500).json({ error: e?.message || String(e) })
+  }
+})
+
 function classifyOrder(base, quote, order, tokenInDec, tokenOutDec) {
   const baseL = toLower(base), quoteL = toLower(quote)
   const tokenIn = toLower(order?.tokenIn), tokenOut = toLower(order?.tokenOut)
